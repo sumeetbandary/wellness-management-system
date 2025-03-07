@@ -17,7 +17,7 @@ COPY . .
 RUN mkdir -p reports
 
 # Expose port
-EXPOSE 5000
+EXPOSE 8080
 
 # Start the application
 CMD ["npm", "start"] 
