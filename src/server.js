@@ -3,11 +3,19 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const { rateLimiter } = require('./middleware/rateLimiter');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const medicationRoutes = require('./routes/medicationRoutes');
-const initMedicationReminders = require('./utils/medicationReminder');
-const scheduleWeeklyReports = require('./utils/reportScheduler');
+
+// Only import these in non-test environment
+let initMedicationReminders;
+let scheduleWeeklyReports;
+if (process.env.NODE_ENV !== 'test') {
+  initMedicationReminders = require('./utils/medicationReminder');
+  scheduleWeeklyReports = require('./utils/reportScheduler');
+}
+
 require('dotenv').config();
 
 // Initialize express app
@@ -20,12 +28,22 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
 
+// Apply rate limiter to all routes except in test environment
+if (process.env.NODE_ENV !== 'test' && rateLimiter) {
+  app.use(rateLimiter);
+}
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/medications', medicationRoutes);
 
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'success', message: 'Server is running' });
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'success',
+    message: 'Server is healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
 });
 
 // Error handling middleware
@@ -33,8 +51,7 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
     status: 'error',
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : {}
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });
 });
 
@@ -60,9 +77,6 @@ const startServer = async () => {
       
       // Initialize weekly report scheduler
       scheduleWeeklyReports();
-      
-      // Import report worker
-      require('./queues/reportWorker');
     }
     
     app.listen(PORT, () => {
