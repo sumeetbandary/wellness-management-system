@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/wellness-management
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - GMAIL_USER=${GMAIL_USER}
+      - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRE=24h
+      - FRONTEND_URL=${FRONTEND_URL}
+    volumes:
+      - ./reports:/usr/src/app/reports
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - wellness-network
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - wellness-network
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - wellness-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  wellness-network:
+    driver: bridge 
